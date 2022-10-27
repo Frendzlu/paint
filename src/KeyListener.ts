@@ -1,6 +1,11 @@
 type Dict<K extends string|number|symbol, V> = {[key in K]: V}
 type fn = () => void
 
+interface IKeyboardEvent {
+    key: string,
+
+}
+
 export default class KeyListener {
     combo: string[] = []
     eventRegistry: Dict<string, fn> = {}
@@ -9,17 +14,31 @@ export default class KeyListener {
     constructor (debugOn: boolean) {
         this.debug = debugOn
         addEventListener("keydown", (e) => {
-            e.preventDefault()
-            if (e.repeat) return
-            this.addToCombo(e.key)
-            this.executeEvent()
-            if (this.debug) console.log("Current combo: ", this.combo.join("+"))
+            if (e.repeat) {
+                if (this.isRegistered()) {
+                    console.log("what")
+                    e.preventDefault()
+                    return
+                }
+            } else {
+                this.addToCombo(e.key)
+                if (this.isRegistered()) {
+                    console.log("what")
+                    e.preventDefault()
+                    this.executeEvent()
+                    if (this.debug) console.log("Current combo: ", this.combo.join("+"))
+                }
+            };
         })
         addEventListener("keyup", (e) => {
-            e.preventDefault()
-            this.removeFromCombo(e.key)
+            this.removeFromCombo(e.key);
             if (this.debug) console.log("Current combo: ", this.combo.join("+"))
         })
+    }
+
+    isRegistered () {
+        console.log(this.eventRegistry[this.combo.join("+")] != undefined)
+        return this.eventRegistry[this.combo.join("+")] != undefined
     }
 
     register(combo: string, fn: fn) {
@@ -39,7 +58,9 @@ export default class KeyListener {
         if (plChars.includes(pressedKey)) {
             pressedKey = enChars[plChars.indexOf(pressedKey)]
         }
-        this.combo.push(pressedKey)
+        if (!this.combo.find(el => el == pressedKey)) {
+            this.combo.push(pressedKey)
+        }
     }
 
     removeFromCombo(key: string) {
