@@ -15,15 +15,11 @@ export default class KeyListener {
         this.debug = debugOn
         addEventListener("keydown", (e) => {
             if (e.repeat) {
-                if (this.isRegistered()) {
-                    console.log("what")
-                    e.preventDefault()
-                    return
-                }
+                return
             } else {
                 this.addToCombo(e.key)
+                console.log(this.combo.join("+"))
                 if (this.isRegistered()) {
-                    console.log("what")
                     e.preventDefault()
                     this.executeEvent()
                     if (this.debug) console.log("Current combo: ", this.combo.join("+"))
@@ -34,10 +30,10 @@ export default class KeyListener {
             this.removeFromCombo(e.key);
             if (this.debug) console.log("Current combo: ", this.combo.join("+"))
         })
+        window.addEventListener("blur", () => this.combo = [])
     }
 
     isRegistered () {
-        console.log(this.eventRegistry[this.combo.join("+")] != undefined)
         return this.eventRegistry[this.combo.join("+")] != undefined
     }
 
@@ -70,3 +66,5 @@ export default class KeyListener {
         }
     }
 }
+
+export let listener = new KeyListener(false)
