@@ -1,4 +1,4 @@
-type Dict<K extends string|number|symbol, V> = {[key in K]: V}
+type Dict<K extends string | number | symbol, V> = { [key in K]: V }
 type fn = () => void
 
 interface IKeyboardEvent {
@@ -8,10 +8,11 @@ interface IKeyboardEvent {
 
 export default class KeyListener {
     combo: string[] = []
-    eventRegistry: Dict<string, fn> = {}
+    downEventRegistry: Dict<string, fn> = {}
+    upEventRegistry: Dict<string, fn> = {}
     debug: boolean
 
-    constructor (debugOn: boolean) {
+    constructor(debugOn: boolean) {
         this.debug = debugOn
         addEventListener("keydown", (e) => {
             if (e.repeat) {
@@ -19,36 +20,55 @@ export default class KeyListener {
             } else {
                 this.addToCombo(e.key)
                 console.log(this.combo.join("+"))
-                if (this.isRegistered()) {
+                if (this.isDownRegistered()) {
                     e.preventDefault()
-                    this.executeEvent()
+                    this.executeDownEvent()
                     if (this.debug) console.log("Current combo: ", this.combo.join("+"))
                 }
             };
         })
         addEventListener("keyup", (e) => {
+            if (this.isUpRegistered()) {
+                e.preventDefault()
+                this.executeUpEvent()
+                if (this.debug) console.log("Current combo: ", this.combo.join("+"))
+            }
             this.removeFromCombo(e.key);
             if (this.debug) console.log("Current combo: ", this.combo.join("+"))
         })
         window.addEventListener("blur", () => this.combo = [])
     }
 
-    isRegistered () {
-        return this.eventRegistry[this.combo.join("+")] != undefined
+    isDownRegistered() {
+        return this.downEventRegistry[this.combo.join("+")] != undefined
     }
 
-    register(combo: string, fn: fn) {
-        this.eventRegistry[combo.toUpperCase()] = fn
+    isUpRegistered() {
+        return this.upEventRegistry[this.combo.join("+")] != undefined
     }
 
-    executeEvent() {
+    registerDown(combo: string, fn: fn) {
+        this.downEventRegistry[combo.toUpperCase()] = fn
+    }
+
+    registerUp(combo: string, fn: fn) {
+        this.upEventRegistry[combo.toUpperCase()] = fn
+    }
+
+    executeDownEvent() {
         let key = this.combo.join("+")
-        let event = this.eventRegistry[key] || (() => {console.log(`No event related to ${key}`)})
+        let event = this.downEventRegistry[key] || (() => { console.log(`No down event related to ${key}`) })
+        event()
+    }
+
+    executeUpEvent() {
+        let key = this.combo.join("+")
+        let event = this.upEventRegistry[key] || (() => { console.log(`No up event related to ${key}`) })
         event()
     }
 
     addToCombo(key: string) {
-        let pressedKey = key.toUpperCase() 
+        let pressedKey = key.toUpperCase()
         let plChars = ["Ś", "Ą", "Ż", "Ź", "Ć", "Ń", "Ł", "Ó", "Ę"]
         let enChars = ["S", "A", "Z", "X", "C", "N", "L", "O", "E"]
         if (plChars.includes(pressedKey)) {

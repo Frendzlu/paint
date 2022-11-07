@@ -1,143 +1,170 @@
 <script lang="ts">
 	import { onMount } from "svelte/internal";
 	import { listener } from "../KeyListener";
+	import {
+		Circle,
+		Drawable,
+		IBristle,
+		Rectangle,
+		type IPaint,
+		type ITool,
+	} from "../Tool";
 
-	let canvasRef: HTMLCanvasElement;
-	let iconRef: HTMLCanvasElement;
-	let offsetLeft, offsetTop;
-	$: context = canvasRef?.getContext("2d");
-	export let paint;
+	let mainCanvasRef: HTMLCanvasElement;
+	let iconCanvasRef: HTMLCanvasElement;
+	let preCommitCanvasRef: HTMLCanvasElement;
+	let offsetLeft: number, offsetTop: number;
+	$: mainCtx = mainCanvasRef?.getContext("2d");
+	$: preCtx = preCommitCanvasRef?.getContext("2d");
+	export let paint: IPaint;
 
 	let pencil = new Drawable("Pencil", [new IBristle()]);
+	let circle = new Circle();
+	let rect = new Rectangle();
 
-	let qualityMod = 1;
+	export let tool: ITool = rect;
 
+	let qualityMod = 2;
 	let imageStack: ImageData[] = [];
 
 	function recomputeWidth() {
-		let previousImage = getImage();
-		canvasRef.width =
-			parseInt(
-				window
-					.getComputedStyle(canvasRef.parentElement)
-					.getPropertyValue("width")
-			) * qualityMod;
-		canvasRef.height =
-			parseInt(
-				window
-					.getComputedStyle(canvasRef.parentElement)
-					.getPropertyValue("height")
-			) * qualityMod;
-		iconRef.width = canvasRef.width;
-		iconRef.height = canvasRef.height;
-		context = canvasRef.getContext("2d");
-		context.imageSmoothingEnabled = false;
-		var image = new Image();
-		image.src = previousImage;
-		image.onload = () => {
-			context.drawImage(image, 0, 0, canvasRef.width, canvasRef.height);
-			console.log("loaded");
-			context.imageSmoothingEnabled = true;
-			context.lineCap = "round";
-			context.lineJoin = "round";
-		};
+		offsetLeft = mainCanvasRef?.parentElement.offsetLeft;
+		offsetTop = mainCanvasRef?.parentElement.offsetTop;
 	}
 
 	addEventListener("resize", recomputeWidth);
 
 	onMount(() => {
-		console.log(canvasRef.parentElement);
-		canvasRef.width =
+		console.log(mainCanvasRef.parentElement);
+		mainCanvasRef.width =
 			parseInt(
 				window
-					.getComputedStyle(canvasRef.parentElement)
+					.getComputedStyle(mainCanvasRef.parentElement)
 					.getPropertyValue("width")
 			) * qualityMod;
-		canvasRef.height =
+		mainCanvasRef.height =
 			parseInt(
 				window
-					.getComputedStyle(canvasRef.parentElement)
+					.getComputedStyle(mainCanvasRef.parentElement)
 					.getPropertyValue("height")
 			) * qualityMod;
-		context = canvasRef.getContext("2d");
-		context.lineCap = "round";
-		context.lineJoin = "round";
-		context.lineWidth = paint.drawSize * qualityMod;
-		context.fillStyle = "white";
-		context.fillRect(0, 0, canvasRef.width, canvasRef.height);
-		context.fillStyle = paint.colour.primary;
+		mainCtx = mainCanvasRef.getContext("2d");
+		preCtx = preCommitCanvasRef.getContext("2d");
+		preCtx.lineCap = "round";
+		preCtx.lineJoin = "round";
+		preCtx.lineWidth = paint.size * qualityMod;
+		mainCtx.fillStyle = "white";
+		mainCtx.fillRect(0, 0, mainCanvasRef.width, mainCanvasRef.height);
+		mainCtx.fillStyle = paint.color.primary;
 		imageStack.push(
-			context.getImageData(0, 0, canvasRef.width, canvasRef.height)
+			mainCtx.getImageData(
+				0,
+				0,
+				mainCanvasRef.width,
+				mainCanvasRef.height
+			)
 		);
-		offsetLeft = canvasRef.parentElement.offsetLeft;
-		offsetTop = canvasRef.parentElement.offsetTop;
-		iconRef.width = canvasRef.width;
-		iconRef.height = canvasRef.height;
+		iconCanvasRef.width = mainCanvasRef.width;
+		iconCanvasRef.height = mainCanvasRef.height;
+		preCommitCanvasRef.width = mainCanvasRef.width;
+		preCommitCanvasRef.height = mainCanvasRef.height;
+		offsetLeft = mainCanvasRef?.parentElement.offsetLeft;
+		offsetTop = mainCanvasRef?.parentElement.offsetTop;
 		setListeners();
 	});
 
 	$: {
-		if (context) {
-			context.strokeStyle = paint.colour.primary;
-			context.fillStyle = paint.colour.primary;
-			context.lineWidth = paint.drawSize * qualityMod;
-			context.fillStyle = paint.colour.primary;
-			context.strokeStyle = paint.colour.primary;
+		if (preCtx) {
+			preCtx.strokeStyle = paint.color.primary;
+			preCtx.fillStyle = paint.color.secondary;
+			preCtx.lineWidth = paint.size * qualityMod;
 		}
 	}
 
 	const setListeners = () => {
-		iconRef.addEventListener("mousedown", listenerHandlers.start, false);
-		iconRef.addEventListener("mousemove", listenerHandlers.draw, false);
-		iconRef.addEventListener("mouseup", listenerHandlers.end, false);
-		iconRef.addEventListener("mousemove", listenerHandlers.drawIcon);
-		iconRef.addEventListener("mouseleave", () =>
-			listenerHandlers.emptyCanvas(iconRef)
+		iconCanvasRef.addEventListener(
+			"mousedown",
+			listenerHandlers.start,
+			false
+		);
+		iconCanvasRef.addEventListener(
+			"mousemove",
+			listenerHandlers.draw,
+			false
+		);
+		iconCanvasRef.addEventListener("mouseup", listenerHandlers.end, false);
+		iconCanvasRef.addEventListener("mousemove", listenerHandlers.drawIcon);
+		iconCanvasRef.addEventListener("mouseleave", () =>
+			listenerHandlers.emptyCanvas(iconCanvasRef)
 		);
 	};
+
+	function rX(e: MouseEvent) {
+		return (
+			((e.clientX - offsetLeft) /
+				mainCanvasRef.parentElement.offsetWidth) *
+			mainCanvasRef.width
+		);
+	}
+
+	function rY(e: MouseEvent) {
+		return (
+			((e.clientY - offsetTop) /
+				mainCanvasRef.parentElement.offsetHeight) *
+			mainCanvasRef.height
+		);
+	}
 
 	const listenerHandlers = {
 		start: (e) => {
 			imageStack.push(
-				context.getImageData(0, 0, canvasRef.width, canvasRef.height)
+				mainCtx.getImageData(
+					0,
+					0,
+					mainCanvasRef.width,
+					mainCanvasRef.height
+				)
 			);
 			paint.drawing = true;
-			context.beginPath();
-			context.moveTo(
-				(e.clientX - offsetLeft) * qualityMod,
-				(e.clientY - offsetTop) * qualityMod
-			);
-			context.lineTo(
-				(e.clientX - offsetLeft) * qualityMod,
-				(e.clientY - offsetTop) * qualityMod
+			tool.onStart(
+				preCtx,
+				{
+					x: rX(e),
+					y: rY(e),
+				},
+				paint
 			);
 			e.preventDefault();
 		},
 		draw: (e) => {
 			if (!paint.drawing) return;
-			context.lineTo(
-				(e.clientX - offsetLeft) * qualityMod,
-				(e.clientY - offsetTop) * qualityMod
+			tool.onMove(
+				preCtx,
+				{
+					x: rX(e),
+					y: rY(e),
+				},
+				paint
 			);
-			context.stroke();
 			e.preventDefault();
 		},
 		end: (e) => {
 			if (!paint.drawing) return;
 			paint.drawing = false;
+			tool.onEnd(preCtx, mainCtx);
+			preCtx.clearRect(0, 0, preCtx.canvas.width, preCtx.canvas.height);
 			e.preventDefault();
 		},
 		drawIcon: (e) => {
-			let ctx = iconRef.getContext("2d");
+			let ctx = iconCanvasRef.getContext("2d");
 			let img = document.getElementById("iconImage") as HTMLImageElement;
-			let width = 30;
-			let height = 30;
-			console.log(img);
-			ctx.clearRect(0, 0, iconRef.width, iconRef.height);
+			let width = 70;
+			let height = 70;
+			ctx.clearRect(0, 0, iconCanvasRef.width, iconCanvasRef.height);
 			ctx.drawImage(
 				img,
-				(e.clientX - offsetLeft) * qualityMod - width * 0.5,
-				(e.clientY - offsetTop) * qualityMod - height * 0.5,
+				rX(e) - width * 0.5,
+				rY(e) - height * 0.5,
 				width,
 				height
 			);
@@ -150,31 +177,44 @@
 	};
 
 	function getImage() {
-		return canvasRef.toDataURL("image/png");
+		return mainCanvasRef.toDataURL("image/png");
 	}
 
-	listener.register("Control+S", () => {
+	listener.registerDown("Control+S", () => {
 		let link = document.createElement("a");
 		link.download = "image.png";
-		link.href = canvasRef.toDataURL();
+		link.href = mainCanvasRef?.toDataURL();
 		link.click();
 	});
-	listener.register("Control+Z", revert);
+	listener.registerDown("Control+Z", revert);
+
+	let sus = true;
+
+	listener.registerDown("Shift", () => (sus = false));
+	listener.registerUp("Shift", () => (sus = true));
 
 	function revert() {
-		if (imageStack.length > 0) context.putImageData(imageStack.pop(), 0, 0);
+		if (imageStack.length > 0) mainCtx.putImageData(imageStack.pop(), 0, 0);
 	}
 </script>
 
+{sus}
 <div id="canvasDiv">
 	<canvas
 		id="iconCanvas"
-		bind:this={iconRef}
+		bind:this={iconCanvasRef}
 		width="150"
 		height="150"
 		style="z-index: 10000;"
 	/>
-	<canvas id="canvas" bind:this={canvasRef} width="150" height="150" />
+	<canvas
+		id="preCommitCanvas"
+		bind:this={preCommitCanvasRef}
+		width="150"
+		height="150"
+		style="z-index: 1000;"
+	/>
+	<canvas id="canvas" bind:this={mainCanvasRef} width="150" height="150" />
 </div>
 
 <style>
@@ -187,7 +227,8 @@
 	}
 
 	#canvas,
-	#iconCanvas {
+	#iconCanvas,
+	#preCommitCanvas {
 		position: absolute;
 		left: 0px;
 		top: 0px;

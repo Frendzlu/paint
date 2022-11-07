@@ -8,12 +8,19 @@ interface IColor {
 	secondary: string
 }
 
-interface ITool {
+export interface IPaint {
+	size: number
+	color: IColor
+	drawing: boolean
+	opacity: number
+}
+
+export interface ITool {
 	toolName: string
 	startPoint: IPoint
-	onStart: (ctx: CanvasRenderingContext2D, mousePosition: IPoint, pickedColors: IColor) => void
-	onMove: (ctx: CanvasRenderingContext2D, mousePosition: IPoint, pickedColors: IColor) => void
-	onEnd: (ctx: CanvasRenderingContext2D, mousePosition: IPoint, pickedColors: IColor) => void
+	onStart: (ctx: CanvasRenderingContext2D, mousePosition: IPoint, paint: IPaint) => void
+	onMove: (ctx: CanvasRenderingContext2D, mousePosition: IPoint, paint: IPaint) => void
+	onEnd: (sourceCtx: CanvasRenderingContext2D, destCtx: CanvasRenderingContext2D) => void
 }
 
 export class IBristle {
@@ -34,11 +41,9 @@ export class IBristle {
 
 export class Drawable implements ITool {
 	toolName: string
-	opacity: number = 1
 	drawingShape: IBristle[]
 	startPoint: IPoint
 	previousPoint: IPoint
-	size: number = 100
 
 	constructor(toolName: string, drawingShape: IBristle[]) {
 		this.toolName = toolName
@@ -46,49 +51,39 @@ export class Drawable implements ITool {
 	}
 
 
-	onStart(ctx: CanvasRenderingContext2D, mousePosition: IPoint, pickedColors: IColor) {
+	onStart(ctx: CanvasRenderingContext2D, mousePosition: IPoint, paint: IPaint) {
 		console.log("sus")
 		this.startPoint = mousePosition
-		ctx.globalCompositeOperation = "difference";
-		ctx.fillStyle = "black";
-		ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-		ctx.globalCompositeOperation = "lighten";
 		ctx.lineCap = "round";
 		ctx.lineJoin = "round";
 		for (let bristle of this.drawingShape.sort((el1, el2) => el1.opacity - el2.opacity)) {
 			console.log(bristle.opacity)
-			ctx.globalAlpha = this.opacity * bristle.opacity
+			ctx.globalAlpha = paint.opacity * bristle.opacity
 			ctx.beginPath()
-			ctx.moveTo(mousePosition.x + bristle.x, mousePosition.y + bristle.y)
-			ctx.lineWidth = bristle.r * 2 * this.size
+			ctx.moveTo(this.startPoint.x + bristle.x, this.startPoint.y + bristle.y)
+			ctx.lineWidth = bristle.r * 2 * paint.size
 			ctx.lineTo(mousePosition.x + bristle.x, mousePosition.y + bristle.y + 0.01)
 			ctx.stroke()
 			//TO-DO: implement hsv modifier
 		}
 		this.previousPoint = this.startPoint
 	}
-	onMove(ctx: CanvasRenderingContext2D, mousePosition: IPoint, pickedColors: IColor) {
-		ctx.globalCompositeOperation = "difference";
-		ctx.fillStyle = "black";
-		ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-		ctx.globalCompositeOperation = "lighten";
+	onMove(ctx: CanvasRenderingContext2D, mousePosition: IPoint, paint: IPaint) {
 		for (let bristle of this.drawingShape) {
-			let color = pickedColors.primary + (255 * this.opacity * bristle.opacity).toString(16).padStart(2, "0")
+			let color = paint.color.primary + (255 * paint.opacity * bristle.opacity).toString(16).padStart(2, "0")
 			ctx.strokeStyle = color
 			ctx.moveTo(this.previousPoint.x + bristle.x, this.previousPoint.y + bristle.y)
-			ctx.lineWidth = bristle.r * 2 * this.size
+			ctx.lineWidth = bristle.r * 2 * paint.size
 			ctx.lineTo(mousePosition.x + bristle.x, mousePosition.y + bristle.y)
 			ctx.stroke()
 			//TO-DO: implement hsv modifier
-		}
-		ctx.globalCompositeOperation = "difference";
-		ctx.fillStyle = "white";
-		ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+		};
 		this.previousPoint = mousePosition
 	}
-	onEnd(context: CanvasRenderingContext2D, mousePosition: IPoint, pickedColors: IColor) {
-		context.stroke()
-		context.closePath()
+	onEnd(sourceCtx: CanvasRenderingContext2D, destCtx: CanvasRenderingContext2D) {
+		sourceCtx.stroke()
+		sourceCtx.closePath()
+		destCtx.drawImage(sourceCtx.canvas, 0, 0)
 	}
 }
 
@@ -96,8 +91,85 @@ export class Selectable implements ITool {
 	toolName: string
 	startPoint: IPoint
 
-	onStart: (context: CanvasRenderingContext2D, mousePosition: IPoint, pickedColors: IColor) => void
-	onMove: (context: CanvasRenderingContext2D, mousePosition: IPoint, pickedColors: IColor) => void
-	onEnd: (context: CanvasRenderingContext2D, mousePosition: IPoint, pickedColors: IColor) => void
-
+	onStart: (context: CanvasRenderingContext2D, mousePosition: IPoint, paint: IPaint) => void
+	onMove: (context: CanvasRenderingContext2D, mousePosition: IPoint, paint: IPaint) => void
+	onEnd: (sourceCtx: CanvasRenderingContext2D, destCtx: CanvasRenderingContext2D) => void
 }
+
+export class Circle implements ITool {
+	toolName: "circle"
+	startPoint: IPoint
+	fill: boolean = false
+
+	constructor() { }
+
+	onStart(ctx: CanvasRenderingContext2D, mousePosition: IPoint, paint: IPaint) {
+		this.startPoint = mousePosition
+	}
+	onMove(ctx: CanvasRenderingContext2D, mousePosition: IPoint, paint: IPaint) {
+		ctx.beginPath()
+		let color = paint.color.primary + (255 * paint.opacity).toString(16).padStart(2, "0")
+		ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height)
+		ctx.strokeStyle = color
+		let sX = (mousePosition.x + this.startPoint.x) / 2
+		let sY = (mousePosition.y + this.startPoint.y) / 2
+		ctx.lineWidth = 2 * paint.size
+		ctx.ellipse(sX, sY, Math.abs(mousePosition.x - sX), Math.abs(mousePosition.y - sY), 0, 0, Math.PI * 2)
+
+		if (this.fill) ctx.fill()
+
+		ctx.stroke()
+	}
+	onEnd(sourceCtx: CanvasRenderingContext2D, destCtx: CanvasRenderingContext2D) {
+		destCtx.drawImage(sourceCtx.canvas, 0, 0)
+	}
+}
+
+export class Rectangle implements ITool {
+	toolName: "rectangle"
+	startPoint: IPoint
+	fill: boolean = true
+
+	constructor() { }
+
+	onStart(ctx: CanvasRenderingContext2D, mousePosition: IPoint, paint: IPaint) {
+		this.startPoint = mousePosition
+	}
+
+	onMove(ctx: CanvasRenderingContext2D, mousePosition: IPoint, paint: IPaint) {
+		ctx.beginPath()
+		let color = paint.color.primary + (255 * paint.opacity).toString(16).padStart(2, "0")
+		ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height)
+		ctx.strokeStyle = color
+		let sX = (mousePosition.x + this.startPoint.x) / 2
+		let sY = (mousePosition.y + this.startPoint.y) / 2
+		ctx.lineWidth = 2 * paint.size
+		ctx.moveTo(this.startPoint.x, this.startPoint.y)
+		ctx.lineTo(this.startPoint.x, mousePosition.y)
+		ctx.lineTo(mousePosition.x, mousePosition.y)
+		ctx.lineTo(mousePosition.x, this.startPoint.y)
+		ctx.closePath()
+		ctx.stroke()
+		if (this.fill) ctx.fill()
+	}
+
+	onEnd(sourceCtx: CanvasRenderingContext2D, destCtx: CanvasRenderingContext2D) {
+		destCtx.drawImage(sourceCtx.canvas, 0, 0)
+	}
+}
+
+//jedno wielkie todo
+// export class Shapes implements ITool {
+// 	toolName: string
+// 	startPoint: IPoint
+// 	pointBasics
+
+// 	constructor(toolName: string, drawingShape: IBristle[]) {
+// 		this.toolName = toolName
+// 		this.drawingShape = drawingShape
+// 	}
+
+// 	onStart: (ctx: CanvasRenderingContext2D, mousePosition: IPoint, paint: IPaint) => void
+// 	onMove: (ctx: CanvasRenderingContext2D, mousePosition: IPoint, paint: IPaint) => void
+// 	onEnd: (sourceCtx: CanvasRenderingContext2D, destCtx: CanvasRenderingContext2D) => void
+// }
