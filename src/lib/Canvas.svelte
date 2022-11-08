@@ -1,10 +1,7 @@
 <script lang="ts">
 	import { onMount } from "svelte/internal";
 	import { listener } from "../KeyListener";
-	import {
-		type IPaint,
-		type ITool,
-	} from "../Tool";
+	import type {IPaint, ITool} from "../Tool";
 
 	let mainCanvasRef: HTMLCanvasElement;
 	let iconCanvasRef: HTMLCanvasElement;
@@ -15,6 +12,7 @@
 	export let paint: IPaint;
 
 	export let tool: ITool;
+	let keepAspectRatio = false;
 
 	let qualityMod = 2;
 	let imageStack: ImageData[] = [];
@@ -107,6 +105,12 @@
 		);
 	}
 
+	function calcIPoint(e: MouseEvent) {
+		return {
+			x: rX(e), y: rY(e), keepAspectRatio: keepAspectRatio 
+		}
+	}
+
 	const listenerHandlers = {
 		start: (e) => {
 			imageStack.push(
@@ -120,10 +124,7 @@
 			paint.drawing = true;
 			tool.onStart(
 				preCtx,
-				{
-					x: rX(e),
-					y: rY(e),
-				},
+				calcIPoint(e),
 				paint
 			);
 			e.preventDefault();
@@ -132,10 +133,7 @@
 			if (!paint.drawing) return;
 			tool.onMove(
 				preCtx,
-				{
-					x: rX(e),
-					y: rY(e),
-				},
+				calcIPoint(e),
 				paint
 			);
 			e.preventDefault();
@@ -180,17 +178,13 @@
 	});
 	listener.registerDown("Control+Z", revert);
 
-	let sus = true;
-
-	listener.registerDown("Shift", () => (sus = false));
-	listener.registerUp("Shift", () => (sus = true));
+	listener.registerDown("Shift", () => (keepAspectRatio = true));
+	listener.registerUp("Shift", () => (keepAspectRatio = false));
 
 	function revert() {
 		if (imageStack.length > 0) mainCtx.putImageData(imageStack.pop(), 0, 0);
 	}
 </script>
-
-{sus}
 <div id="canvasDiv">
 	<canvas
 		id="iconCanvas"

@@ -1,6 +1,7 @@
 interface IPoint {
   x: number;
   y: number;
+  keepAspectRatio?: boolean;
 }
 
 interface IColor {
@@ -19,6 +20,7 @@ export interface ITool {
   toolName: string;
   startPoint: IPoint;
   imgURL: string;
+  fill: boolean;
   onStart: (
     ctx: CanvasRenderingContext2D,
     mousePosition: IPoint,
@@ -33,6 +35,34 @@ export interface ITool {
     sourceCtx: CanvasRenderingContext2D,
     destCtx: CanvasRenderingContext2D
   ) => void;
+}
+
+function modAspectRatioShape(
+  mPoint: IPoint,
+  sPoint: IPoint,
+  orthogonal: boolean = false
+) {
+  if (!mPoint.keepAspectRatio) return mPoint;
+  let dX = Math.abs(mPoint.x - sPoint.x);
+  let dY = Math.abs(mPoint.y - sPoint.y);
+  let sgnX = Math.sign(mPoint.x - sPoint.x);
+  let sgnY = Math.sign(mPoint.y - sPoint.y);
+  let result = {
+    x: dY < dX ? sPoint.x + dY * sgnX : mPoint.x,
+    y: dX < dY ? sPoint.y + dX * sgnY : mPoint.y,
+    keepAspectRatio: true,
+  };
+  if (orthogonal) {
+    if (dX < dY && dX < dY / 2) {
+      result.x = sPoint.x;
+      result.y = mPoint.y;
+    }
+    if (dY < dX && dY < dX / 2) {
+      result.y = sPoint.y;
+      result.x = mPoint.x;
+    }
+  }
+  return result;
 }
 
 export class IBristle {
@@ -63,6 +93,7 @@ export class Drawable implements ITool {
   startPoint: IPoint;
   previousPoint: IPoint;
   imgURL: string;
+  fill: boolean;
 
   constructor(toolName: string, drawingShape: IBristle[], imgUrl?: string) {
     this.toolName = toolName;
@@ -75,6 +106,7 @@ export class Drawable implements ITool {
     this.startPoint = mousePosition;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
+    let mPoint = modAspectRatioShape(mousePosition, this.startPoint, true);
     for (let bristle of this.drawingShape.sort(
       (el1, el2) => el1.opacity - el2.opacity
     )) {
@@ -83,16 +115,14 @@ export class Drawable implements ITool {
       ctx.beginPath();
       ctx.moveTo(this.startPoint.x + bristle.x, this.startPoint.y + bristle.y);
       ctx.lineWidth = bristle.r * 2 * paint.size;
-      ctx.lineTo(
-        mousePosition.x + bristle.x,
-        mousePosition.y + bristle.y + 0.01
-      );
+      ctx.lineTo(mPoint.x + bristle.x, mPoint.y + bristle.y + 0.01);
       ctx.stroke();
       //TO-DO: implement hsv modifier
     }
     this.previousPoint = this.startPoint;
   }
   onMove(ctx: CanvasRenderingContext2D, mousePosition: IPoint, paint: IPaint) {
+    let mPoint = modAspectRatioShape(mousePosition, this.startPoint, true);
     for (let bristle of this.drawingShape) {
       let color =
         paint.color.primary +
@@ -103,7 +133,7 @@ export class Drawable implements ITool {
         this.previousPoint.y + bristle.y
       );
       ctx.lineWidth = bristle.r * 2 * paint.size;
-      ctx.lineTo(mousePosition.x + bristle.x, mousePosition.y + bristle.y);
+      ctx.lineTo(mPoint.x + bristle.x, mPoint.y + bristle.y);
       ctx.stroke();
       //TO-DO: implement hsv modifier
     }
@@ -123,6 +153,7 @@ export class Selectable implements ITool {
   toolName: string;
   startPoint: IPoint;
   imgURL: string;
+  fill: boolean;
 
   onStart: (
     context: CanvasRenderingContext2D,
@@ -154,19 +185,20 @@ export class Circle implements ITool {
     this.startPoint = mousePosition;
   }
   onMove(ctx: CanvasRenderingContext2D, mousePosition: IPoint, paint: IPaint) {
+    let mPoint = modAspectRatioShape(mousePosition, this.startPoint, true);
     ctx.beginPath();
     let color =
       paint.color.primary + (255 * paint.opacity).toString(16).padStart(2, "0");
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
     ctx.strokeStyle = color;
-    let sX = (mousePosition.x + this.startPoint.x) / 2;
-    let sY = (mousePosition.y + this.startPoint.y) / 2;
+    let sX = (mPoint.x + this.startPoint.x) / 2;
+    let sY = (mPoint.y + this.startPoint.y) / 2;
     ctx.lineWidth = 2 * paint.size;
     ctx.ellipse(
       sX,
       sY,
-      Math.abs(mousePosition.x - sX),
-      Math.abs(mousePosition.y - sY),
+      Math.abs(mPoint.x - sX),
+      Math.abs(mPoint.y - sY),
       0,
       0,
       Math.PI * 2
@@ -199,21 +231,55 @@ export class Rectangle implements ITool {
   }
 
   onMove(ctx: CanvasRenderingContext2D, mousePosition: IPoint, paint: IPaint) {
+    let mPoint = modAspectRatioShape(mousePosition, this.startPoint);
     ctx.beginPath();
     let color =
       paint.color.primary + (255 * paint.opacity).toString(16).padStart(2, "0");
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
     ctx.strokeStyle = color;
-    let sX = (mousePosition.x + this.startPoint.x) / 2;
-    let sY = (mousePosition.y + this.startPoint.y) / 2;
     ctx.lineWidth = 2 * paint.size;
     ctx.moveTo(this.startPoint.x, this.startPoint.y);
-    ctx.lineTo(this.startPoint.x, mousePosition.y);
-    ctx.lineTo(mousePosition.x, mousePosition.y);
-    ctx.lineTo(mousePosition.x, this.startPoint.y);
+    ctx.lineTo(this.startPoint.x, mPoint.y);
+    ctx.lineTo(mPoint.x, mPoint.y);
+    ctx.lineTo(mPoint.x, this.startPoint.y);
     ctx.closePath();
     ctx.stroke();
     if (this.fill) ctx.fill();
+  }
+
+  onEnd(
+    sourceCtx: CanvasRenderingContext2D,
+    destCtx: CanvasRenderingContext2D
+  ) {
+    destCtx.drawImage(sourceCtx.canvas, 0, 0);
+  }
+}
+
+export class Line implements ITool {
+  toolName = "line";
+  startPoint: IPoint;
+  fill: boolean = false;
+  imgURL: string;
+
+  constructor(imgUrl?: string) {
+    this.imgURL = imgUrl || "src/assets/" + this.toolName + ".png";
+  }
+
+  onStart(ctx: CanvasRenderingContext2D, mousePosition: IPoint, paint: IPaint) {
+    this.startPoint = mousePosition;
+  }
+
+  onMove(ctx: CanvasRenderingContext2D, mousePosition: IPoint, paint: IPaint) {
+    let mPoint = modAspectRatioShape(mousePosition, this.startPoint, true);
+    let color =
+      paint.color.primary + (255 * paint.opacity).toString(16).padStart(2, "0");
+    ctx.beginPath();
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    ctx.moveTo(this.startPoint.x, this.startPoint.y);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2 * paint.size;
+    ctx.lineTo(mPoint.x, mPoint.y);
+    ctx.stroke();
   }
 
   onEnd(

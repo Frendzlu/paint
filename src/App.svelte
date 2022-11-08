@@ -1,7 +1,7 @@
 <script lang="ts">
     import { listener } from "./KeyListener";
     import Canvas from "./lib/Canvas.svelte";
-    import { Circle, Drawable, IBristle, type ITool, Rectangle } from "./Tool";
+    import { Circle, Drawable, IBristle, type ITool, Rectangle, Line } from "./Tool";
 
     let size = 1;
     let sizeSlider: HTMLInputElement;
@@ -82,13 +82,14 @@
     let fill = false
 
     listener.registerDown("X", switchColors);
-    listener.registerDown("F", () => fill = !fill);
+    listener.registerDown("F", () => {fill = !fill; updateFill()});
 
     let sizeN = 1
 
     function updateSlider() {
         let adjusted = Math.max(Math.min(sizeN, max), min);
-        sizeInput.value = (Math.log(adjusted / min) / Math.log(base)).toString();
+        size = Math.log(adjusted / min) / Math.log(base)
+        sizeSlider.value = (size).toString();
     }
 
     function updateValue(value) {
@@ -106,11 +107,12 @@
     let tools = [
         new Drawable("pencil", [new IBristle()]),
 	    new Circle(),
-	    new Rectangle()
+	    new Rectangle(),
+        new Line()
     ]
 
     function updateFill() {
-        tools.forEach(t => t.fill)
+        tools.forEach(t => t.fill = fill)
     }
 
     let tool: ITool = tools[0]
@@ -157,16 +159,24 @@
                 class="primaryCol"
                 style={coloredDiv(paint.color.primary)}
                 on:click={() => userColorDef(paint.color.primary, 0, false)}
-                on:keydown={() => {}}
+                on:keydown
             />
             <div
                 class="secondaryCol"
                 style={coloredDiv(paint.color.secondary)}
                 on:click={() =>
                     userColorDef(paint.color.secondary, 0, false, false)}
-                on:keydown={() => {}}
+                on:keydown
             />
         </div>
+        <input
+            style="height: 1rem; margin-top: 1.25rem; width: 4rem;"
+            type="number"
+            bind:this={sizeInput}
+            on:change={updateSlider}
+            placeholder="1"
+            bind:value={sizeN}
+        />
         <input
             type="range"
             bind:this={sizeSlider}
@@ -174,20 +184,14 @@
             max="200"
             min="1"
         />
-        <input
-            type="number"
-            bind:this={sizeInput}
-            bind:value={sizeN}
-        />
-        <label class="switch">
-            <input type="checkbox" bind:checked={fill}>
+        <label class="switch" style="margin-top: 0.8rem">
+            <input type="checkbox" bind:checked={fill} on:change={updateFill}>
             <span class="slider"></span>
         </label>
         <div id="shapes">
             {#each tools as ptool}
-                <p>{ptool.toolName}</p>
-                <div class:selected={ptool.toolName == tool.toolName} class="tooldiv" on:click={() =>tool = ptool}>
-                    <img class="dafuq" src={ptool.imgURL}>
+                <div class:selected={ptool.toolName == tool.toolName} class="tooldiv" on:click={() =>tool = ptool} on:keydown>
+                    <img class="dafuq" src={ptool.imgURL} alt="sus">
                 </div>
             {/each}
         </div>
@@ -196,6 +200,9 @@
 </main>
 
 <style>
+    .switch {
+        margin: 1rem;
+    }
     .sus {
         width: 1rem;
         height: 1rem;
@@ -247,5 +254,9 @@
         max-height: 100%;
         width: auto;
         height: auto;
+    }
+    #shapes {
+        display: flex;
+        flex-direction: row;
     }
 </style>
