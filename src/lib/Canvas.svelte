@@ -2,10 +2,6 @@
 	import { onMount } from "svelte/internal";
 	import { listener } from "../KeyListener";
 	import {
-		Circle,
-		Drawable,
-		IBristle,
-		Rectangle,
 		type IPaint,
 		type ITool,
 	} from "../Tool";
@@ -18,11 +14,7 @@
 	$: preCtx = preCommitCanvasRef?.getContext("2d");
 	export let paint: IPaint;
 
-	let pencil = new Drawable("Pencil", [new IBristle()]);
-	let circle = new Circle();
-	let rect = new Rectangle();
-
-	export let tool: ITool = rect;
+	export let tool: ITool;
 
 	let qualityMod = 2;
 	let imageStack: ImageData[] = [];

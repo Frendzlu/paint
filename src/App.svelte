@@ -1,6 +1,7 @@
 <script lang="ts">
     import { listener } from "./KeyListener";
     import Canvas from "./lib/Canvas.svelte";
+    import { Circle, Drawable, IBristle, type ITool, Rectangle } from "./Tool";
 
     let size = 1;
     let sizeSlider: HTMLInputElement;
@@ -77,17 +78,22 @@
     }
 
     let inputRef: HTMLInputElement = undefined;
+    let sizeInput: HTMLInputElement = undefined
+    let fill = false
+
     listener.registerDown("X", switchColors);
+    listener.registerDown("F", () => fill = !fill);
 
-    // function updateSlider() {
-    //     let value = +document.getElementById('value').value,
-    //         adjusted = Math.max(Math.min(value, max), min);
+    let sizeN = 1
 
-    //     document.getElementById('slider').value = Math.log(adjusted / min) / Math.log(base);
-    // }
+    function updateSlider() {
+        let adjusted = Math.max(Math.min(sizeN, max), min);
+        sizeInput.value = (Math.log(adjusted / min) / Math.log(base)).toString();
+    }
 
     function updateValue(value) {
-        return parseInt((min * base ** value).toFixed(0));
+        sizeN = parseInt((min * base ** value).toFixed(0));
+        return sizeN
     }
 
     const min = 1,
@@ -97,6 +103,17 @@
 
     //document.getElementById('value').addEventListener('change', updateSlider);
     //document.getElementById('slider').addEventListener('click', updateValue);
+    let tools = [
+        new Drawable("pencil", [new IBristle()]),
+	    new Circle(),
+	    new Rectangle()
+    ]
+
+    function updateFill() {
+        tools.forEach(t => t.fill)
+    }
+
+    let tool: ITool = tools[0]
 </script>
 
 <main>
@@ -157,8 +174,25 @@
             max="200"
             min="1"
         />
+        <input
+            type="number"
+            bind:this={sizeInput}
+            bind:value={sizeN}
+        />
+        <label class="switch">
+            <input type="checkbox" bind:checked={fill}>
+            <span class="slider"></span>
+        </label>
+        <div id="shapes">
+            {#each tools as ptool}
+                <p>{ptool.toolName}</p>
+                <div class:selected={ptool.toolName == tool.toolName} class="tooldiv" on:click={() =>tool = ptool}>
+                    <img class="dafuq" src={ptool.imgURL}>
+                </div>
+            {/each}
+        </div>
     </div>
-    <Canvas {paint} />
+    <Canvas {paint} {tool} />
 </main>
 
 <style>
@@ -197,5 +231,21 @@
     .secondaryCol {
         top: 1rem;
         left: 1rem;
+    }
+
+    .selected {
+        background-color: rgba(69, 69, 169, 0.69);
+    }
+    .tooldiv {
+        width: 3rem;
+        height: 3rem;
+        padding: 0.5rem;
+    }
+
+    .dafuq {
+        max-width: 100%;
+        max-height: 100%;
+        width: auto;
+        height: auto;
     }
 </style>
